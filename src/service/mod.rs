@@ -1,7 +1,7 @@
 pub mod service_impl;
 
-use thiserror::Error;
 use crate::task::Task;
+use thiserror::Error;
 
 pub struct CreateTaskDto {
     pub title: String,
@@ -20,11 +20,11 @@ pub enum ServiceError {
 }
 
 pub trait Service {
-    fn get_all(&self) -> Vec<Task>;
-    fn get_all_undone(&self) -> Vec<Task>;
-    fn get_all_done(&self) -> Vec<Task>;
-    fn get(&self, id: i32) -> Option<Task>;
-    fn create(&self, task: CreateTaskDto) -> Task;
-    fn update(&self, id: i32, task: UpdateTaskDto) -> Option<Task>;
-    fn mark_done(&self, id: i32) -> Option<Task>;
+    fn get_all(&self) -> Result<Vec<Task>, ServiceError>;
+    fn get_all_undone(&self) -> Result<Vec<Task>, ServiceError>;
+    fn get_all_done(&self) -> Result<Vec<Task>, ServiceError>;
+    fn get(&self, id: i32) -> Result<Option<Task>, ServiceError>;
+    fn create(&self, task: CreateTaskDto) -> Result<Task, ServiceError>;
+    fn update(&self, id: i32, task: UpdateTaskDto) -> Result<Option<Task>, ServiceError>;
+    fn mark_done(&self, id: i32) -> Result<Option<Task>, ServiceError>;
 }

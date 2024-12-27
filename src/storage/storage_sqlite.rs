@@ -1,6 +1,7 @@
 use crate::storage::{Storage, StorageError, StorageInit};
 use crate::task::Task;
-use rusqlite::{Connection, Error};
+use chrono::{DateTime, Utc};
+use rusqlite::{Connection, Error, Row};
 use std::path::Path;
 
 pub struct StorageSqlite {
@@ -27,35 +28,116 @@ impl StorageInit for StorageSqlite {
                 id INTEGER PRIMARY KEY,
                 title TEXT NOT NULL,
                 description TEXT NOT NULL,
+                created TEXT NOT NULL,
+                updated TEXT NULL,
                 done BOOLEAN NOT NULL
             )",
             [],
         )?;
+
+        self.connection.execute(
+            "CREATE INDEX IF NOT EXISTS ix_tasks_done_created ON tasks (done, updated DESC)",
+            [],
+        )?;
+
         Ok(())
     }
 }
 
+fn parse_row(row: &Row) -> Result<Task, Error> {
+    let created_str: String = row.get(3)?;
+    let updated_str: Option<String> = row.get(4)?;
+    Ok(Task {
+        id: row.get(0)?,
+        title: row.get(1)?,
+        description: row.get(2)?,
+        created: created_str.parse::<DateTime<Utc>>().unwrap(),
+        updated: updated_str.map(|s| s.parse::<DateTime<Utc>>().unwrap()),
+        done: row.get(5)?,
+    })
+}
+
 impl Storage for StorageSqlite {
-    fn get_all(&self) -> Vec<Task> {
-        todo!()
-    }
-    fn get_all_undone(&self) -> Vec<Task> {
-        todo!()
+    fn get_all(&self) -> Result<Vec<Task>, StorageError> {
+        let mut stmt = self
+            .connection
+            .prepare("SELECT id, title, description, created, updated, done FROM tasks")?;
+        let task_iter = stmt.query_map([], |row| parse_row(row))?;
+
+        let mut tasks = Vec::new();
+        for task in task_iter {
+            tasks.push(task?);
+        }
+        Ok(tasks)
     }
 
-    fn get_all_done(&self) -> Vec<Task> {
-        todo!()
+    fn get_all_undone(&self) -> Result<Vec<Task>, StorageError> {
+        let mut stmt = self.connection.prepare(
+            "SELECT id, title, description, created, updated, done FROM tasks WHERE done = false",
+        )?;
+        let task_iter = stmt.query_map([], |row| parse_row(row))?;
+
+        let mut tasks = Vec::new();
+        for task in task_iter {
+            tasks.push(task?);
+        }
+        Ok(tasks)
     }
 
-    fn get(&self, id: i32) -> Option<Task> {
-        todo!()
+    fn get_all_done(&self) -> Result<Vec<Task>, StorageError> {
+        let mut stmt = self.connection.prepare(
+            "SELECT id, title, description, created, updated, done FROM tasks WHERE done = true",
+        )?;
+        let task_iter = stmt.query_map([], |row| parse_row(row))?;
+
+        let mut tasks = Vec::new();
+        for task in task_iter {
+            tasks.push(task?);
+        }
+        Ok(tasks)
     }
 
-    fn create(&self, task: Task) -> Task {
-        todo!()
+    fn get(&self, id: i32) -> Result<Option<Task>, StorageError> {
+        let mut stmt = self.connection.prepare(
+            "SELECT id, title, description, created, updated, done FROM tasks WHERE id = ?1",
+        )?;
+        let result = stmt.query_row([id], |row| parse_row(row));
+        match result {
+            Ok(task) => Ok(Some(task)),
+            Err(Error::QueryReturnedNoRows) => Ok(None),
+            Err(err) => Err(err.into()),
+        }
     }
 
-    fn update(&self, task: Task) -> Option<Task> {
-        todo!()
+    fn create(&self, task: Task) -> Result<Task, StorageError> {
+        let created_str = task.created.to_rfc3339();
+        let updated_str = task.updated.map(|dt| dt.to_rfc3339());
+        self.connection.execute(
+            "INSERT INTO tasks (title, description, created, updated, done) VALUES (?1, ?2, ?3, ?4, ?5)",
+            (
+                task.title,
+                task.description,
+                created_str,
+                updated_str,
+                task.done,
+            ),
+        )?;
+        let id = self.connection.last_insert_rowid() as i32;
+        self.get(id).map(|task| task.unwrap())
+    }
+
+    fn update(&self, task: Task) -> Result<Task, StorageError> {
+        let updated_str = task.updated.map(|dt| dt.to_rfc3339());
+        self.connection.execute(
+            "UPDATE tasks SET title = ?1, description = ?2, updated = ?3, done = ?4 WHERE id = ?5",
+            (
+                task.title,
+                task.description,
+                updated_str,
+                task.done,
+                task.id,
+            ),
+        )?;
+        self.get(task.id).map(|task| task.unwrap())
     }
 }
