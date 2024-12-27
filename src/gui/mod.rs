@@ -1,15 +1,37 @@
+mod support;
+
 use crate::service::Service;
+use crate::task::Task;
+use imgui::Condition;
 
 pub struct Gui {
     service: Box<dyn Service>,
+    tasks: Vec<Task>,
 }
 
 impl Gui {
     pub fn new(service: Box<dyn Service>) -> Gui {
-        Gui { service }
+        let tasks = service.get_all_undone().unwrap();
+        Gui { service, tasks }
     }
 
     pub fn run(&self) {
-        println!("Running GUI with service");
+        let mut value = 0;
+        let choices = ["test test this is 1", "test test this is 2"];
+        support::simple_init("TODO", move |_, ui| {
+            ui.window("Tasks")
+                .collapsible(false)
+                .resizable(false)
+                .position([0.0, 0.0], Condition::Always)
+                .size([1024.0, 768.0], Condition::Always)
+                .title_bar(false)
+                .build(|| {
+                    ui.same_line();
+                    ui.checkbox("Show Done", &mut false);
+                    ui.same_line();
+                    ui.label_text("Filter", "Filter by:");
+                    ui.separator();
+                });
+        });
     }
 }
