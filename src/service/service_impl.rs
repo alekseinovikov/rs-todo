@@ -1,9 +1,26 @@
-use crate::service::{CreateTaskDto, Service, UpdateTaskDto};
-use crate::storage::Storage;
+use crate::service::{CreateTaskDto, Service, ServiceError, UpdateTaskDto};
+use crate::storage::{Storage, StorageError, StorageInit};
 use crate::task::Task;
 
 pub struct ServiceImpl {
     storage: Box<dyn Storage>,
+}
+
+impl ServiceImpl {
+    pub fn new<T: Storage + StorageInit + 'static>(
+        storage: Box<T>,
+    ) -> Result<ServiceImpl, ServiceError> {
+        storage.init()?;
+        Ok(ServiceImpl { storage })
+    }
+}
+
+impl From<StorageError> for ServiceError {
+    fn from(error: StorageError) -> Self {
+        match error {
+            StorageError::DatabaseError(msg) => ServiceError::StorageError(msg),
+        }
+    }
 }
 
 impl Service for ServiceImpl {

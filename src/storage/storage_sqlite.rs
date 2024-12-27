@@ -1,23 +1,37 @@
-use crate::storage::Storage;
+use crate::storage::{Storage, StorageError, StorageInit};
 use crate::task::Task;
-use rusqlite::Connection;
+use rusqlite::{Connection, Error};
 use std::path::Path;
-use thiserror::Error;
 
 pub struct StorageSqlite {
     connection: Connection,
 }
 
-#[derive(Error, Debug)]
-pub enum StorageError {
-    #[error("error on database operation: `{0}`")]
-    DatabaseError(#[from] rusqlite::Error),
+impl From<Error> for StorageError {
+    fn from(err: Error) -> StorageError {
+        StorageError::DatabaseError(format!("error on database operation: {}", err))
+    }
 }
 
 impl StorageSqlite {
     pub fn new(file_path: &str) -> Result<StorageSqlite, StorageError> {
         let connection = Connection::open(Path::new(file_path))?;
         Ok(StorageSqlite { connection })
+    }
+}
+
+impl StorageInit for StorageSqlite {
+    fn init(&self) -> Result<(), StorageError> {
+        self.connection.execute(
+            "CREATE TABLE IF NOT EXISTS tasks (
+                id INTEGER PRIMARY KEY,
+                title TEXT NOT NULL,
+                description TEXT NOT NULL,
+                done BOOLEAN NOT NULL
+            )",
+            [],
+        )?;
+        Ok(())
     }
 }
 

@@ -1,5 +1,6 @@
-mod service_impl;
+pub mod service_impl;
 
+use thiserror::Error;
 use crate::task::Task;
 
 pub struct CreateTaskDto {
@@ -10,6 +11,12 @@ pub struct CreateTaskDto {
 pub struct UpdateTaskDto {
     pub title: Option<String>,
     pub description: Option<String>,
+}
+
+#[derive(Error, Debug)]
+pub enum ServiceError {
+    #[error("`{0}`")]
+    StorageError(String),
 }
 
 pub trait Service {
