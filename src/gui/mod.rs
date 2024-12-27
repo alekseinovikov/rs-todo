@@ -1,18 +1,25 @@
 mod support;
 
 use crate::service::Service;
-use crate::task::Task;
+use crate::task::ShortTask;
 use imgui::Condition;
+
+struct ViewState {
+    undone_tasks: Vec<ShortTask>,
+}
 
 pub struct Gui {
     service: Box<dyn Service>,
-    tasks: Vec<Task>,
+    state: ViewState,
 }
 
 impl Gui {
     pub fn new(service: Box<dyn Service>) -> Gui {
         let tasks = service.get_all_undone().unwrap();
-        Gui { service, tasks }
+        Gui {
+            service,
+            state: ViewState { undone_tasks: tasks },
+        }
     }
 
     pub fn run(&self) {

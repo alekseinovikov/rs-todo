@@ -1,11 +1,18 @@
-use chrono::Utc;
+use chrono::{DateTime, Utc};
+
+pub struct ShortTask {
+    pub id: i32,
+    pub title: String,
+    pub updated: DateTime<Utc>,
+    pub done: bool,
+}
 
 pub struct Task {
     pub id: i32,
     pub title: String,
     pub description: String,
-    pub created: chrono::DateTime<Utc>,
-    pub updated: Option<chrono::DateTime<Utc>>,
+    pub created: DateTime<Utc>,
+    pub updated: DateTime<Utc>,
     pub done: bool,
 }
 
@@ -16,7 +23,7 @@ impl Task {
             title,
             description,
             created: Utc::now(),
-            updated: None,
+            updated: Utc::now(),
             done: false,
         }
     }

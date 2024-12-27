@@ -1,5 +1,5 @@
 use crate::storage::{Storage, StorageError, StorageInit};
-use crate::task::Task;
+use crate::task::{ShortTask, Task};
 use chrono::{DateTime, Utc};
 use rusqlite::{Connection, Error, Row};
 use std::path::Path;
@@ -29,7 +29,7 @@ impl StorageInit for StorageSqlite {
                 title TEXT NOT NULL,
                 description TEXT NOT NULL,
                 created TEXT NOT NULL,
-                updated TEXT NULL,
+                updated TEXT NOT NULL,
                 done BOOLEAN NOT NULL
             )",
             [],
@@ -44,25 +44,35 @@ impl StorageInit for StorageSqlite {
     }
 }
 
-fn parse_row(row: &Row) -> Result<Task, Error> {
+fn parse_full_row(row: &Row) -> Result<Task, Error> {
     let created_str: String = row.get(3)?;
-    let updated_str: Option<String> = row.get(4)?;
+    let updated_str: String = row.get(4)?;
     Ok(Task {
         id: row.get(0)?,
         title: row.get(1)?,
         description: row.get(2)?,
         created: created_str.parse::<DateTime<Utc>>().unwrap(),
-        updated: updated_str.map(|s| s.parse::<DateTime<Utc>>().unwrap()),
+        updated: updated_str.parse::<DateTime<Utc>>().unwrap(),
         done: row.get(5)?,
     })
 }
 
+fn parse_short_row(row: &Row) -> Result<ShortTask, Error> {
+    let updated_str: String = row.get(2)?;
+    Ok(ShortTask {
+        id: row.get(0)?,
+        title: row.get(1)?,
+        updated: updated_str.parse::<DateTime<Utc>>().unwrap(),
+        done: row.get(3)?,
+    })
+}
+
 impl Storage for StorageSqlite {
-    fn get_all(&self) -> Result<Vec<Task>, StorageError> {
+    fn get_all(&self) -> Result<Vec<ShortTask>, StorageError> {
         let mut stmt = self
             .connection
-            .prepare("SELECT id, title, description, created, updated, done FROM tasks")?;
-        let task_iter = stmt.query_map([], |row| parse_row(row))?;
+            .prepare("SELECT id, title, updated, done FROM tasks")?;
+        let task_iter = stmt.query_map([], |row| parse_short_row(row))?;
 
         let mut tasks = Vec::new();
         for task in task_iter {
@@ -71,11 +81,11 @@ impl Storage for StorageSqlite {
         Ok(tasks)
     }
 
-    fn get_all_undone(&self) -> Result<Vec<Task>, StorageError> {
+    fn get_all_undone(&self) -> Result<Vec<ShortTask>, StorageError> {
         let mut stmt = self.connection.prepare(
-            "SELECT id, title, description, created, updated, done FROM tasks WHERE done = false",
+            "SELECT id, title, updated, done FROM tasks WHERE done = false ORDER BY updated DESC",
         )?;
-        let task_iter = stmt.query_map([], |row| parse_row(row))?;
+        let task_iter = stmt.query_map([], |row| parse_short_row(row))?;
 
         let mut tasks = Vec::new();
         for task in task_iter {
@@ -84,11 +94,11 @@ impl Storage for StorageSqlite {
         Ok(tasks)
     }
 
-    fn get_all_done(&self) -> Result<Vec<Task>, StorageError> {
+    fn get_all_done(&self) -> Result<Vec<ShortTask>, StorageError> {
         let mut stmt = self.connection.prepare(
-            "SELECT id, title, description, created, updated, done FROM tasks WHERE done = true",
+            "SELECT id, title, updated, done FROM tasks WHERE done = true ORDER BY updated DESC",
         )?;
-        let task_iter = stmt.query_map([], |row| parse_row(row))?;
+        let task_iter = stmt.query_map([], |row| parse_short_row(row))?;
 
         let mut tasks = Vec::new();
         for task in task_iter {
@@ -101,7 +111,7 @@ impl Storage for StorageSqlite {
         let mut stmt = self.connection.prepare(
             "SELECT id, title, description, created, updated, done FROM tasks WHERE id = ?1",
         )?;
-        let result = stmt.query_row([id], |row| parse_row(row));
+        let result = stmt.query_row([id], |row| parse_full_row(row));
         match result {
             Ok(task) => Ok(Some(task)),
             Err(Error::QueryReturnedNoRows) => Ok(None),
@@ -111,7 +121,7 @@ impl Storage for StorageSqlite {
 
     fn create(&self, task: Task) -> Result<Task, StorageError> {
         let created_str = task.created.to_rfc3339();
-        let updated_str = task.updated.map(|dt| dt.to_rfc3339());
+        let updated_str = task.updated.to_rfc3339();
         self.connection.execute(
             "INSERT INTO tasks (title, description, created, updated, done) VALUES (?1, ?2, ?3, ?4, ?5)",
             (
@@ -127,7 +137,7 @@ impl Storage for StorageSqlite {
     }
 
     fn update(&self, task: Task) -> Result<Task, StorageError> {
-        let updated_str = task.updated.map(|dt| dt.to_rfc3339());
+        let updated_str = task.updated.to_rfc3339();
         self.connection.execute(
             "UPDATE tasks SET title = ?1, description = ?2, updated = ?3, done = ?4 WHERE id = ?5",
             (

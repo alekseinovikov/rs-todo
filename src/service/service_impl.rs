@@ -1,6 +1,6 @@
 use crate::service::{CreateTaskDto, Service, ServiceError, UpdateTaskDto};
 use crate::storage::{Storage, StorageError, StorageInit};
-use crate::task::Task;
+use crate::task::{ShortTask, Task};
 use chrono::Utc;
 
 pub struct ServiceImpl {
@@ -25,15 +25,15 @@ impl From<StorageError> for ServiceError {
 }
 
 impl Service for ServiceImpl {
-    fn get_all(&self) -> Result<Vec<Task>, ServiceError> {
+    fn get_all(&self) -> Result<Vec<ShortTask>, ServiceError> {
         Ok(self.storage.get_all()?)
     }
 
-    fn get_all_undone(&self) -> Result<Vec<Task>, ServiceError> {
+    fn get_all_undone(&self) -> Result<Vec<ShortTask>, ServiceError> {
         Ok(self.storage.get_all_undone()?)
     }
 
-    fn get_all_done(&self) -> Result<Vec<Task>, ServiceError> {
+    fn get_all_done(&self) -> Result<Vec<ShortTask>, ServiceError> {
         Ok(self.storage.get_all_done()?)
     }
 
@@ -60,7 +60,7 @@ impl Service for ServiceImpl {
             task.description = description;
         }
 
-        task.updated = Some(Utc::now());
+        task.updated = Utc::now();
         Ok(Some(self.storage.update(task)?))
     }
 
@@ -72,7 +72,7 @@ impl Service for ServiceImpl {
 
         let mut task = task.unwrap();
         task.done = true;
-        task.updated = Some(Utc::now());
+        task.updated = Utc::now();
         Ok(Some(self.storage.update(task)?))
     }
 }
