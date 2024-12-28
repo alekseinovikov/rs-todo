@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 
+#[derive(Clone)]
 pub struct ShortTask {
     pub id: i32,
     pub title: String,
@@ -7,6 +8,7 @@ pub struct ShortTask {
     pub done: bool,
 }
 
+#[derive(Clone)]
 pub struct Task {
     pub id: i32,
     pub title: String,

@@ -1,21 +1,13 @@
 mod list;
 mod state;
 mod support;
+mod details;
 
 use crate::gui::state::ViewState;
 use crate::service::Service;
-use imgui::Ui;
 
 pub struct Gui {
     state: ViewState,
-}
-
-trait Draw {
-    fn draw(&self, ui: &Ui);
-}
-
-trait WindowDraw {
-    fn draw(&self, ui: &mut Ui);
 }
 
 impl Gui {
@@ -26,7 +18,7 @@ impl Gui {
     }
 
     pub fn run(self) {
-        let state = self.state;
+        let mut state = self.state;
         support::simple_init("TODO", move |_, ui| {
             state.draw(ui);
         });
